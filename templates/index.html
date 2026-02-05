@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTR 时刻表查询</title>
+    <!-- 引入Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 2rem;
+        }
+        .card {
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">MTR 时刻表查询系统</h1>
+        
+        <!-- 车站查询卡片 -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">车站时刻表查询</h5>
+            </div>
+            <div class="card-body">
+                <form id="stationForm">
+                    <div class="mb-3">
+                        <label for="stationName" class="form-label">车站名称</label>
+                        <input type="text" class="form-control" id="stationName" name="station_name" placeholder="请输入车站名称">
+                    </div>
+                    <button type="submit" class="btn btn-primary">查询</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 线路查询卡片 -->
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">线路列车查询</h5>
+            </div>
+            <div class="card-body">
+                <form id="routeForm">
+                    <div class="mb-3">
+                        <label for="routeName" class="form-label">线路名称</label>
+                        <input type="text" class="form-control" id="routeName" name="route_name" placeholder="请输入线路名称">
+                    </div>
+                    <button type="submit" class="btn btn-success">查询</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 列车查询卡片 -->
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">列车详细查询</h5>
+            </div>
+            <div class="card-body">
+                <form id="trainForm">
+                    <div class="mb-3">
+                        <label for="trainStationName" class="form-label">车站名称</label>
+                        <input type="text" class="form-control" id="trainStationName" name="station_name" placeholder="请输入车站名称">
+                    </div>
+                    <div class="mb-3">
+                        <label for="trainId" class="form-label">列车ID</label>
+                        <input type="text" class="form-control" id="trainId" name="train_id" placeholder="请输入列车ID">
+                    </div>
+                    <button type="submit" class="btn btn-info">查询</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 随机列车查询卡片 -->
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0">随机列车查询</h5>
+            </div>
+            <div class="card-body">
+                <button id="randomTrainBtn" class="btn btn-warning">查询随机列车</button>
+            </div>
+        </div>
+        
+        <!-- 加载中状态 -->
+        <div class="loading" id="loading">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2">加载中，请稍候...</p>
+        </div>
+        
+        <!-- 查询结果 -->
+        <div class="result" id="result">
+            <h3 class="text-center mb-3">查询结果</h3>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+    
+    <!-- 引入Bootstrap JS和jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // 初始化结果区域为隐藏
+            $('#result').hide();
+            
+            // 车站查询
+            $('#stationForm').submit(function(e) {
+                e.preventDefault();
+                queryData('/station', $(this).serialize());
+            });
+            
+            // 线路查询
+            $('#routeForm').submit(function(e) {
+                e.preventDefault();
+                queryData('/route', $(this).serialize());
+            });
+            
+            // 列车查询
+            $('#trainForm').submit(function(e) {
+                e.preventDefault();
+                queryData('/train', $(this).serialize());
+            });
+            
+            // 随机列车查询
+            $('#randomTrainBtn').click(function() {
+                queryData('/random_train', '');
+            });
+            
+            // 查询数据的通用函数
+            function queryData(url, data) {
+                // 显示加载中状态
+                $('#loading').show();
+                $('#result').hide();
+                
+                // 发送AJAX请求
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: data,
+                    success: function(response) {
+                        // 隐藏加载中状态
+                        $('#loading').hide();
+                        
+                        // 显示结果
+                        $('#result').show();
+                        
+                        // 处理响应数据
+                        if (response.error) {
+                            $('#resultContent').html('<div class="alert alert-danger">' + response.error + '</div>');
+                        } else {
+                            // 根据不同的查询类型显示不同的结果
+                            if (response.station && !response.train_id) {
+                                // 车站查询结果
+                                let timetableHtml = '<pre class="bg-light p-3 rounded">' + response.timetable + '</pre>';
+                                $('#resultContent').html(
+                                    '<h4>车站: ' + response.station + '</h4>' +
+                                    timetableHtml
+                                );
+                            } else if (response.route && !response.train_id) {
+                                // 线路查询结果
+                                $('#resultContent').html(
+                                    '<h4>线路: ' + response.route + '</h4>' +
+                                    '<p>列车数据: ' + response.trains + '</p>'
+                                );
+                            } else if (response.train_id || response.status) {
+                                // 列车查询结果或随机列车结果
+                                let resultHtml = '';
+                                if (response.train_id) {
+                                    resultHtml += '<h4>列车ID: ' + response.train_id + '</h4>';
+                                }
+                                if (response.station) {
+                                    resultHtml += '<p>车站: ' + response.station + '</p>';
+                                }
+                                if (response.route) {
+                                    resultHtml += '<h4>线路: ' + response.route + '</h4>';
+                                }
+                                if (response.status) {
+                                    let statusText = '';
+                                    if (response.status.length === 1) {
+                                        statusText = '状态: 停站 ' + response.status[0];
+                                    } else if (response.status.length === 2) {
+                                        statusText = '状态: 运行中，从 ' + response.status[0] + ' 到 ' + response.status[1];
+                                    }
+                                    resultHtml += '<p>' + statusText + '</p>';
+                                }
+                                if (response.schedule && Array.isArray(response.schedule)) {
+                                    resultHtml += '<h5>时刻表:</h5>';
+                                    resultHtml += '<table class="table table-striped table-bordered">';
+                                    resultHtml += '<thead><tr><th>车站</th><th>到达时间</th><th>发车时间</th></tr></thead>';
+                                    resultHtml += '<tbody>';
+                                    response.schedule.forEach(station => {
+                                        resultHtml += '<tr>';
+                                        resultHtml += '<td>' + station.name + '</td>';
+                                        resultHtml += '<td>' + (station.arrival || '-') + '</td>';
+                                        resultHtml += '<td>' + (station.departure || '-') + '</td>';
+                                        resultHtml += '</tr>';
+                                    });
+                                    resultHtml += '</tbody>';
+                                    resultHtml += '</table>';
+                                }
+                                $('#resultContent').html(resultHtml);
+                            }
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        // 隐藏加载中状态
+                        $('#loading').hide();
+                        
+                        // 显示错误信息
+                        $('#result').show();
+                        $('#resultContent').html('<div class="alert alert-danger">请求失败: ' + error + '</div>');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
